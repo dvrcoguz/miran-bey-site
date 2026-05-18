@@ -30,7 +30,7 @@ st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🏛️ Miran Bey K
 with st.sidebar:
     st.markdown("### 🔐 Yönetim Paneli")
     admin_sifre = st.text_input("Yönetici Şifresi", type="password")
-    is_admin = (admin_sifre == "miran123")
+    is_admin = (admin_sifre == "miran3458")
     if is_admin:
         st.success("Yönetici olarak giriş yapıldı!")
     elif admin_sifre != "":
