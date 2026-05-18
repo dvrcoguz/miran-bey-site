@@ -7,13 +7,11 @@ import os
 st.set_page_config(page_title="Miran Bey Konakları", page_icon="🏛️", layout="wide")
 
 # --- VERİ DOSYALARI KONTROLÜ (Verilerin kaybolmaması için) ---
-# Eğer bu dosyalar yoksa otomatik olarak boş şablonlar oluşturulur
 if not os.path.exists("butce.csv"):
     pd.DataFrame(columns=["Tarih", "Açıklama", "Tutar", "Tür"]).to_csv("butce.csv", index=False)
 if not os.path.exists("duyurular.csv"):
     pd.DataFrame(columns=["Tarih", "Başlık", "İçerik"]).to_csv("duyurular.csv", index=False)
 if not os.path.exists("aidat.csv"):
-    # Başlangıç için örnek birkaç veri
     ornek_aidat = pd.DataFrame([
         {"Blok": "A", "Daire": "1", "Sakin": "Ahmet Yılmaz", "Dönem": "Mayıs 2026", "Durum": "Ödendi"},
         {"Blok": "B", "Daire": "5", "Sakin": "Mehmet Demir", "Dönem": "Mayıs 2026", "Durum": "Gecikti"},
@@ -23,28 +21,26 @@ if not os.path.exists("aidat.csv"):
 if not os.path.exists("arizalar.csv"):
     pd.DataFrame(columns=["Tarih", "Daire", "Başlık", "Açıklama", "Durum"]).to_csv("arizalar.csv", index=False)
 if not os.path.exists("kasa.txt"):
-    with open("kasa.txt", "w") as f: f.write("50000") # Başlangıç kasası 50.000 TL
+    with open("kasa.txt", "w") as f: f.write("50000")
 
 # --- ÜST BAŞLIK VE LOGO ---
 st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🏛️ Miran Bey Konakları Site Yönetimi</h1>", unsafe_allow_html=True)
 
-# --- GİRİŞ SİSTEMİ (Yönetici Girişi) ---
-# Sayfa sağ üst köşesinde küçük bir giriş alanı
+# --- GİRİŞ SİSTEMİ ---
 with st.sidebar:
     st.markdown("### 🔐 Yönetim Paneli")
     admin_sifre = st.text_input("Yönetici Şifresi", type="password")
-    is_admin = (admin_sifre == "miran3458") # ŞİFRENİZ BURASI
+    is_admin = (admin_sifre == "miran123")
     if is_admin:
         st.success("Yönetici olarak giriş yapıldı!")
     elif admin_sifre != "":
         st.error("Hatalı Şifre!")
 
-# --- ⏳ GERİ SAYIM SAYACI (Her ayın 10'una göre) ---
+# --- ⏳ GERİ SAYIM SAYACI ---
 simdi = datetime.now()
 bu_ay_10 = datetime(simdi.year, simdi.month, 10, 23, 59, 59)
 
 if simdi > bu_ay_10:
-    # Eğer ayın 10'u geçildiyse sonraki ayın 10'unu hedefle
     if simdi.month == 12:
         sonraki_ay_10 = datetime(simdi.year + 1, 1, 10, 23, 59, 59)
     else:
@@ -70,18 +66,14 @@ menu = st.radio(
 st.write("---")
 
 # ==========================================
-# 1. MENÜ: GÜNCEL SİTE BÜTÇESİ
+# 1. MENÜ: GÜNCEL SİTE BÜTÇESİ (GÜNCELLENDİ 🛠️)
 # ==========================================
 if menu == "📊 Güncel Site Bütçesi":
     st.subheader("📊 Güncel Site Bütçesi ve Harcamalar")
     
-    # Kasa Bakiyesi Okuma
     with open("kasa.txt", "r") as f: kasa_bakiyesi = float(f.read())
-    
-    # Büyük Bakiye Kutusu
     st.metric(label="💰 Kasa Toplam Bakiyesi", value=f"{kasa_bakiyesi:,.2f} TL")
     
-    # Admin Bütçe Düzenleme Alanı
     if is_admin:
         st.markdown("### ⚙️ Yönetici Bütçe Düzenleme")
         col1, col2 = st.columns(2)
@@ -104,16 +96,40 @@ if menu == "📊 Güncel Site Bütçesi":
                     df_butce = pd.concat([df_butce, yeni_harcama], ignore_index=True)
                     df_butce.to_csv("butce.csv", index=False)
                     
-                    # Kasadan düşme işlemi
                     with open("kasa.txt", "w") as f: f.write(str(kasa_bakiyesi - h_tutar))
                     st.success("Harcama kaydedildi ve bakiyeden düşüldü!")
                     st.rerun()
 
-    # Harcama Listesi (Herkes Görebilir)
     st.markdown("#### 📜 Yapılan Harcamalar Listesi")
     df_butce = pd.read_csv("butce.csv")
+    
     if len(df_butce) > 0:
-        st.dataframe(df_butce.sort_values(by="Tarih", ascending=False), use_container_width=True)
+        # Harcamaları tarihe göre sıralayıp gösteriyoruz
+        df_butce = df_butce.sort_values(by="Tarih", ascending=False).reset_index(drop=True)
+        
+        # Eğer admin ise silme butonlu özel liste gösteriyoruz
+        if is_admin:
+            st.caption("Yönetici Girişi Aktif: Hatalı harcamaları aşağıdaki listeden iptal edebilirsiniz. Silinen tutar kasaya geri yüklenecektir.")
+            for idx, row in df_butce.iterrows():
+                col_tarih, col_aciklama, col_tutar, col_buton = st.columns([2, 5, 3, 2])
+                with col_tarih: st.write(row['Tarih'])
+                with col_aciklama: st.write(row['Açıklama'])
+                with col_tutar: st.write(f"{row['Tutar']:,.2f} TL")
+                with col_buton:
+                    if st.button("❌ İptal Et/Sil", key=f"del_h_{idx}"):
+                        # Kasaya parayı geri ekle
+                        guncel_kasa = kasa_bakiyesi + float(row['Tutar'])
+                        with open("kasa.txt", "w") as f: f.write(str(guncel_kasa))
+                        
+                        # Tablodan bu satırı sil
+                        df_butce = df_butce.drop(idx)
+                        df_butce.to_csv("butce.csv", index=False)
+                        
+                        st.success("Harcama iptal edildi, tutar kasaya geri yüklendi!")
+                        st.rerun()
+        else:
+            # Normal kullanıcılar düz tablo görür
+            st.dataframe(df_butce, use_container_width=True)
     else:
         st.info("Henüz yapılmış bir harcama kaydı bulunmuyor.")
 
@@ -136,10 +152,9 @@ elif menu == "📢 Duyurular":
                 st.success("Duyuru başarıyla yayınlandı!")
                 st.rerun()
 
-    # Duyuruları Listele (Herkes Görebilir)
     df_duyuru = pd.read_csv("duyurular.csv")
     if len(df_duyuru) > 0:
-        for idx, row in df_duyuru.iloc[::-1].iterrows(): # Tersten listeler (En yeni en üstte)
+        for idx, row in df_duyuru.iloc[::-1].iterrows():
             with st.container():
                 st.markdown(f"### 📌 {row['Başlık']}")
                 st.caption(f"📅 Yayınlanma Tarihi: {row['Tarih']}")
@@ -155,25 +170,20 @@ elif menu == "📢 Duyurular":
         st.info("Yayınlanmış aktif bir duyuru bulunmuyor.")
 
 # ==========================================
-# 3. MENÜ: AİDAT ÖDEME DURUMU (Modern Excel)
+# 3. MENÜ: AİDAT ÖDEME DURUMU
 # ==========================================
 elif menu == "💳 Aidat Ödeme Durumu":
     st.subheader("💳 Aidat ve Borç Takip Tablosu")
-    st.caption("Arama kutusunu kullanarak kendi dairenizi filtreleyebilirsiniz. Tablo üzerinde değişiklik yapma yetkisi sadece yöneticiye aittir.")
     
     df_aidat = pd.read_csv("aidat.csv")
-    
-    # Arama ve Filtreleme Kutusu (Herkes için)
     arama = st.text_input("🔍 Tabloda Ara (Blok, Daire No veya İsim girin):")
     if arama:
         df_goster = df_aidat[df_aidat.astype(str).apply(lambda x: x.str.contains(arama, case=False)).any(axis=1)]
     else:
         df_goster = df_aidat
 
-    # Modern Excel Tablosu Görünümü
     st.dataframe(df_goster, use_container_width=True)
     
-    # Admin Aidat Ekleme/Düzenleme Alanı
     if is_admin:
         st.markdown("### ⚙️ Yönetici Veri Girişi / Düzenleme")
         col1, col2 = st.columns(2)
@@ -191,7 +201,7 @@ elif menu == "💳 Aidat Ödeme Durumu":
                     yeni_a = pd.DataFrame([{"Blok": a_blok, "Daire": a_daire, "Sakin": a_sakin, "Dönem": a_donem, "Durum": a_durum}])
                     df_aidat = pd.concat([df_aidat, yeni_a], ignore_index=True)
                     df_aidat.to_csv("aidat.csv", index=False)
-                    st.success("Yeni veri başarıyla ekelendi!")
+                    st.success("Yeni veri başarıyla eklendi!")
                     st.rerun()
                     
         with col2:
@@ -212,7 +222,6 @@ elif menu == "💳 Aidat Ödeme Durumu":
 elif menu == "🛠️ Arıza Bildir":
     st.subheader("🛠️ Arıza ve Talep Bildirim Formu")
     
-    # Sakinlerin Form Doldurma Alanı (Herkes Açık)
     st.markdown("### 📋 Yeni Arıza Bildirim Formu")
     ari_daire = st.text_input("Blok ve Daireniz (Örn: A Blok Daire 5)")
     ari_baslik = st.text_input("Arıza Başlığı (Örn: Asansör Bozuk, Hidrofor Ses Yapıyor)")
@@ -227,7 +236,6 @@ elif menu == "🛠️ Arıza Bildir":
             st.success("Bildiriminiz site yönetimine başarıyla ulaştırıldı. Teşekkür ederiz!")
             st.rerun()
             
-    # Gelen Kutusu (SADECE ADMIN GÖREBİLİR)
     if is_admin:
         st.write("---")
         st.markdown("### 📬 Gelen Arıza / Talep Kutusu (Sadece Yönetici)")
