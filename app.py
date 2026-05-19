@@ -1,21 +1,23 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from streamlit_autorefresh import st_autorefresh
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Miran Bey Konakları", page_icon="🏛️", layout="wide")
 
+# --- ⚡ CANLI SAYAÇ MOTORU (HER 1 SANİYEDE BİR SAYFAYI TETİKLER) ---
+# Bu sayede geri sayım saniye saniye canlı olarak ekranda akar
+st_autorefresh(interval=1000, key="sayac_refresh")
+
 # --- GOOGLE DRIVE (SHEETS) BAĞLANTI AYARI ---
-# Senin Google E-Tablonun benzersiz kimliği
 SHEET_ID = "1RFz1DlYbdAHsPbCMc2UYF53_j2xmo1DyJ1_ks6IgrJw"
 
-@st.cache_data(ttl=2) # Verileri her 2 saniyede bir tazeler, Drive'da yaptığın değişiklik anında yansır
+@st.cache_data(ttl=2)
 def verileri_cek(sayfa_adi):
-    # Google Drive'dan ilgili sekmeyi CSV formatında çeken güvenli link
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={sayfa_adi}"
     try:
         df = pd.read_csv(url)
-        # Eğer Google Sheets sekmesi tamamen boşsa hata vermemesi için şablon oluşturuyoruz
         if df.empty:
             if sayfa_adi == "butce": return pd.DataFrame(columns=["Tarih", "Açıklama", "Tutar", "Tür"])
             if sayfa_adi == "duyurular": return pd.DataFrame(columns=["Tarih", "Başlık", "İçerik"])
@@ -23,7 +25,7 @@ def verileri_cek(sayfa_adi):
             if sayfa_adi == "arizalar": return pd.DataFrame(columns=["Tarih", "Daire", "Başlık", "Açıklama", "Durum"])
         return df
     except Exception as e:
-        st.error(f"Google Drive Bağlantı Hatası ({sayfa_adi}): {e}")
+        st.error(f"Bağlantı Hatası ({sayfa_adi}): {e}")
         return pd.DataFrame()
 
 def veriyi_guncelle_mesaji():
@@ -42,7 +44,7 @@ with st.sidebar:
     elif admin_sifre != "":
         st.error("Hatalı Şifre!")
 
-# --- ⏳ GERİ SAYIM SAYACI ---
+# --- ⏳ SANİYE SANİYE GERİ SAYIM SAYACI ---
 simdi = datetime.now()
 bu_ay_10 = datetime(simdi.year, simdi.month, 10, 23, 59, 59)
 
@@ -56,11 +58,14 @@ else:
     hedef_tarih = bu_ay_10
 
 kalan_sure = hedef_tarih - simdi
+
+# Gün, saat, dakika ve saniyeleri tam hesaplama matematiği
 gun = kalan_sure.days
 saat = kalan_sure.seconds // 3600
 dakika = (kalan_sure.seconds % 3600) // 60
+saniye = kalan_sure.seconds % 60
 
-st.info(f"⏳ **Bir Sonraki Aidat Son Ödeme Tarihine Kalan Süre:** {gun} Gün, {saat} Saat, {dakika} Dakika")
+st.info(f"⏳ **Bir Sonraki Aidat Son Ödeme Tarihine Kalan Süre:** {gun} Gün, {saat} Saat, {dakika} Dakika, {saniye} Saniye")
 
 # --- 📱 MENÜ SEÇİMİ ---
 menu = st.radio(
@@ -72,27 +77,23 @@ menu = st.radio(
 st.write("---")
 
 # ==========================================
-# 1. MENÜ: GÜNCEL SİTE BÜTÇESİ (DRIVE ENTEGRELİ + GELİR-GİDER MOTORU)
+# 1. MENÜ: GÜNCEL SİTE BÜTÇESİ (TEMİZLENDİ ❌)
 # ==========================================
 if menu == "📊 Güncel Site Bütçesi":
     st.subheader("📊 Güncel Site Bütçesi ve Harcamalar")
     
     df_butce = verileri_cek("butce")
     
-    # İstediğin gibi başlangıç kasası tam olarak 0 (sıfır) abi 🎯
     guncel_kasa_bakiyesi = 0.0
     
     if not df_butce.empty and "Tutar" in df_butce.columns and "Tür" in df_butce.columns:
-        # Boş satırları filtrele
         df_butce = df_butce.dropna(subset=["Tutar", "Tür"])
         
-        # Google Drive'dan gelen satırları tek tek okuyup bütçeyi hesaplayan motor
         for idx, row in df_butce.iterrows():
             try:
                 tutar = float(str(row["Tutar"]).replace(",", ".").strip())
                 tur = str(row["Tür"]).strip().lower()
                 
-                # Tür kısmına girilen veriye göre artı veya eksi yansıtma
                 if tur == "gelir":
                     guncel_kasa_bakiyesi += tutar
                 elif tur == "gider":
@@ -106,7 +107,8 @@ if menu == "📊 Güncel Site Bütçesi":
         st.markdown("### ⚙️ Yönetici Bütçe Düzenleme")
         veriyi_guncelle_mesaji()
 
-    st.markdown("#### 📜 Bütçe Hareketleri Listesi (Google Drive'dan Gelen)")
+    # İSTEDİĞİN GİBİ "(Google Drive'dan Gelen)" İBARESİ TAMAMEN KALDIRILDI 🏛️
+    st.markdown("#### 📜 Bütçe Hareketleri Listesi")
     if not df_butce.empty and len(df_butce) > 0:
         if "Tarih" in df_butce.columns:
             df_butce = df_butce.sort_values(by="Tarih", ascending=False).reset_index(drop=True)
