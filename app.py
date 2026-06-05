@@ -7,7 +7,6 @@ from streamlit_autorefresh import st_autorefresh
 st.set_page_config(page_title="Miran Bey Konakları", page_icon="🏛️", layout="wide")
 
 # --- ⚡ CANLI SAYAÇ MOTORU (HER 1 SANİYEDE BİR SAYFAYI TETİKLER) ---
-# Bu sayede geri sayım saniye saniye canlı olarak ekranda akar
 st_autorefresh(interval=1000, key="sayac_refresh")
 
 # --- GOOGLE DRIVE (SHEETS) BAĞLANTI AYARI ---
@@ -44,22 +43,23 @@ with st.sidebar:
     elif admin_sifre != "":
         st.error("Hatalı Şifre!")
 
-# --- ⏳ SANİYE SANİYE GERİ SAYIM SAYACI ---
+# --- ⏳ SANİYE SANİYE GERİ SAYIM SAYACI (HER AYIN 5'İNE AYARLANDI 🎯) ---
 simdi = datetime.now()
-bu_ay_10 = datetime(simdi.year, simdi.month, 10, 23, 59, 59)
+bu_ay_5 = datetime(simdi.year, simdi.month, 5, 23, 59, 59)
 
-if simdi > bu_ay_10:
+# Eğer ayın 5'ini geçtiysek, sayaç otomatik olarak bir sonraki ayın 5'ini hedef alır
+if simdi > bu_ay_5:
     if simdi.month == 12:
-        sonraki_ay_10 = datetime(simdi.year + 1, 1, 10, 23, 59, 59)
+        sonraki_ay_5 = datetime(simdi.year + 1, 1, 5, 23, 59, 59)
     else:
-        sonraki_ay_10 = datetime(simdi.year, simdi.month + 1, 10, 23, 59, 59)
-    hedef_tarih = sonraki_ay_10
+        sonraki_ay_5 = datetime(simdi.year, simdi.month + 1, 5, 23, 59, 59)
+    hedef_tarih = sonraki_ay_5
 else:
-    hedef_tarih = bu_ay_10
+    hedef_tarih = bu_ay_5
 
 kalan_sure = hedef_tarih - simdi
 
-# Gün, saat, dakika ve saniyeleri tam hesaplama matematiği
+# Gün, saat, dakika ve saniye hesaplama
 gun = kalan_sure.days
 saat = kalan_sure.seconds // 3600
 dakika = (kalan_sure.seconds % 3600) // 60
@@ -77,7 +77,7 @@ menu = st.radio(
 st.write("---")
 
 # ==========================================
-# 1. MENÜ: GÜNCEL SİTE BÜTÇESİ (TEMİZLENDİ ❌)
+# 1. MENÜ: GÜNCEL SİTE BÜTÇESİ
 # ==========================================
 if menu == "📊 Güncel Site Bütçesi":
     st.subheader("📊 Güncel Site Bütçesi ve Harcamalar")
@@ -107,7 +107,6 @@ if menu == "📊 Güncel Site Bütçesi":
         st.markdown("### ⚙️ Yönetici Bütçe Düzenleme")
         veriyi_guncelle_mesaji()
 
-    # İSTEDİĞİN GİBİ "(Google Drive'dan Gelen)" İBARESİ TAMAMEN KALDIRILDI 🏛️
     st.markdown("#### 📜 Bütçe Hareketleri Listesi")
     if not df_butce.empty and len(df_butce) > 0:
         if "Tarih" in df_butce.columns:
