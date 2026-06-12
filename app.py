@@ -6,7 +6,7 @@ from streamlit_autorefresh import st_autorefresh
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Miran Bey Konakları", page_icon="🏛️", layout="wide")
 
-# --- ⚡ CANLI SAYAÇ MOTORU (HER 1 SANİYEDE BİR SAYFAYI TETİKLER) ---
+# --- ⚡ CANLI SAYAÇ MOTORU ---
 st_autorefresh(interval=1000, key="sayac_refresh")
 
 # --- GOOGLE DRIVE (SHEETS) BAĞLANTI AYARI ---
@@ -17,6 +17,12 @@ def verileri_cek(sayfa_adi):
     url = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={sayfa_adi}"
     try:
         df = pd.read_csv(url)
+        
+        # UNNAMED VE BOŞ SATIRLARI TEMİZLEYEN FİLTRE
+        if not df.empty:
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            df = df.dropna(how="all")
+            
         if df.empty:
             if sayfa_adi == "butce": return pd.DataFrame(columns=["Tarih", "Açıklama", "Tutar", "Tür"])
             if sayfa_adi == "duyurular": return pd.DataFrame(columns=["Tarih", "Başlık", "İçerik"])
@@ -43,11 +49,10 @@ with st.sidebar:
     elif admin_sifre != "":
         st.error("Hatalı Şifre!")
 
-# --- ⏳ SANİYE SANİYE GERİ SAYIM SAYACI (HER AYIN 5'İNE AYARLANDI 🎯) ---
+# --- ⏳ SANİYE SANİYE GERİ SAYIM SAYACI (AYIN 5'İ) ---
 simdi = datetime.now()
 bu_ay_5 = datetime(simdi.year, simdi.month, 5, 23, 59, 59)
 
-# Eğer ayın 5'ini geçtiysek, sayaç otomatik olarak bir sonraki ayın 5'ini hedef alır
 if simdi > bu_ay_5:
     if simdi.month == 12:
         sonraki_ay_5 = datetime(simdi.year + 1, 1, 5, 23, 59, 59)
@@ -59,7 +64,6 @@ else:
 
 kalan_sure = hedef_tarih - simdi
 
-# Gün, saat, dakika ve saniye hesaplama
 gun = kalan_sure.days
 saat = kalan_sure.seconds // 3600
 dakika = (kalan_sure.seconds % 3600) // 60
@@ -110,7 +114,17 @@ if menu == "📊 Güncel Site Bütçesi":
     st.markdown("#### 📜 Bütçe Hareketleri Listesi")
     if not df_butce.empty and len(df_butce) > 0:
         if "Tarih" in df_butce.columns:
-            df_butce = df_butce.sort_values(by="Tarih", ascending=False).reset_index(drop=True)
+            # 🎯 AKILLI TARİH DÖNÜŞTÜRÜCÜ MOTOR 🎯
+            # Excel'deki farklı tarih formatlarını (noktalı, tireli vs.) akıllıca gerçeğe çevirir
+            df_butce["Gecici_Tarih"] = pd.to_datetime(df_butce["Tarih"], dayfirst=True, errors='coerce')
+            # Eğer çevrilemeyen hatalı format varsa eski metni korur, çökmez
+            df_butce["Gecici_Tarih"] = df_butce["Gecici_Tarih"].fillna(pd.to_datetime(df_butce["Tarih"], errors='coerce'))
+            
+            # Gerçek tarih yapısına göre en yeni tarihi EN ÜSTTE gösterecek şekilde sıralar
+            df_butce = df_butce.sort_values(by="Gecici_Tarih", ascending=False).reset_index(drop=True)
+            # Geçici oluşturduğumuz teknik sütunu gizliyoruz, kirlilik yapmasın
+            df_butce = df_butce.drop(columns=["Gecici_Tarih"])
+            
         st.dataframe(df_butce, use_container_width=True, hide_index=True)
     else:
         st.info("Henüz yapılmış bir bütçe hareketi (Gelir/Gider) kaydı bulunmuyor.")
